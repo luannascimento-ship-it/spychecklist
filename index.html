@@ -1,0 +1,2664 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0c0e" />
+<title>Análise de Concorrente — Dossiê</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,400;1,9..144,500;1,9..144,700&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root {
+    /* dossier noir — deep ink with warm undertone */
+    --ink:        #0b0c0e;
+    --ink-1:      #131418;
+    --ink-2:      #1a1c22;
+    --ink-3:      #23262e;
+    --rule:       #2a2e38;
+    --rule-soft:  #1f222a;
+    --paper:      #efe8d6;
+    --text:       #ece4d2;
+    --text-mid:   #a8a294;
+    --text-dim:   #6c6a62;
+    /* signal palette — single confident accent + supporting warmth */
+    --signal:     #e8a33d;
+    --signal-bright: #f5b651;
+    --signal-deep:#b87a26;
+    --terra:      #c66b3d;
+    --sage:       #7da982;
+    --crimson:    #c93838;
+    /* semantic */
+    --bg:         var(--ink);
+    --bg-elev:    var(--ink-1);
+    --bg-elev-2:  var(--ink-2);
+    --border:     var(--rule);
+    --accent:     var(--signal);
+    --accent-2:   var(--terra);
+    --success:    var(--sage);
+    --warn:       var(--signal);
+    --danger:     var(--crimson);
+    --radius:     4px;
+    --radius-lg:  10px;
+    --shadow-sm:  0 1px 2px rgba(0,0,0,.4);
+    --shadow:     0 12px 40px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35);
+    --grain:      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.85  0 0 0 0 0.7  0 0 0 0.045 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  [data-theme="light"] {
+    --ink:        #f4ecd8;
+    --ink-1:      #ebe2cb;
+    --ink-2:      #e0d6bc;
+    --ink-3:      #d4c8a9;
+    --rule:       #c8bb98;
+    --rule-soft:  #d8cba9;
+    --text:       #1a1814;
+    --text-mid:   #4a4639;
+    --text-dim:   #6e6a59;
+    --signal:     #b87a26;
+    --signal-bright: #d8902e;
+    --paper:      #fff8e7;
+    --shadow-sm:  0 1px 0 rgba(60,40,20,.08);
+    --shadow:     0 12px 40px rgba(60,40,20,.12), 0 2px 4px rgba(60,40,20,.06);
+    --grain:      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: grid; grid-template-columns: 340px 1fr;
+    overflow: hidden;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    position: relative;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+    background-image: var(--grain); opacity: .55; mix-blend-mode: overlay;
+  }
+  /* typography helpers */
+  .display, .display-italic { font-family: 'Fraunces', Georgia, serif; font-feature-settings: "ss01", "ss02"; letter-spacing: -.01em; }
+  .display-italic { font-style: italic; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .label-mini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--text-dim); font-weight: 500;
+  }
+  /* ===== SIDEBAR ===== */
+  aside {
+    background: var(--bg-elev); border-right: 1px solid var(--rule-soft);
+    display: flex; flex-direction: column; height: 100vh;
+    position: relative;
+  }
+  aside::after {
+    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+    background: linear-gradient(180deg, transparent, var(--signal) 40%, var(--signal) 60%, transparent);
+    opacity: .25; pointer-events: none;
+  }
+  .brand {
+    padding: 22px 20px 18px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .brand-logo {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--ink-2);
+    border: 1px solid var(--signal);
+    display: grid; place-items: center; color: var(--signal);
+    position: relative; flex-shrink: 0;
+  }
+  .brand-logo svg { width: 22px; height: 22px; }
+  .brand-logo::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    border: 1px dashed var(--signal); opacity: .25;
+  }
+  .brand h1 {
+    font-family: 'Fraunces', Georgia, serif; font-weight: 600;
+    font-size: 17px; margin: 0; letter-spacing: -.01em;
+    line-height: 1.1;
+  }
+  .brand small {
+    color: var(--text-dim); font-size: 9px;
+    letter-spacing: .22em; text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace; display: block; margin-top: 4px;
+  }
+  .sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim); margin-left: auto; position: relative;
+  }
+  .sync-dot.ok { background: var(--sage); box-shadow: 0 0 8px rgba(125,169,130,.5); }
+  .sync-dot.err { background: var(--crimson); }
+  .sync-dot.syncing { background: var(--signal); animation: pulse-glow 1.4s infinite; }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(232,163,61,.6); }
+    50% { opacity: .5; box-shadow: 0 0 0 8px rgba(232,163,61,0); }
+  }
+
+  .view-tabs {
+    display: flex; padding: 14px 16px 0; gap: 0;
+    border-bottom: 1px solid var(--rule-soft); margin-bottom: 4px;
+  }
+  .view-tabs button {
+    flex: 1; background: transparent; border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim); padding: 9px 8px 11px;
+    font-size: 11px; cursor: pointer; transition: all .2s;
+    font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+    font-family: 'Geist', sans-serif;
+    position: relative;
+  }
+  .view-tabs button:hover { color: var(--text); }
+  .view-tabs button.active {
+    color: var(--signal); border-bottom-color: var(--signal);
+  }
+
+  .sidebar-actions { display: flex; gap: 8px; padding: 14px 16px 10px; }
+  .search { padding: 4px 16px 10px; position: relative; }
+  .search::before {
+    content: '/'; position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-dim); pointer-events: none;
+    background: var(--ink-2); border: 1px solid var(--rule); padding: 1px 5px; border-radius: 3px;
+  }
+  .search input {
+    width: 100%; background: var(--ink); border: 1px solid var(--rule-soft);
+    color: var(--text); border-radius: 6px; padding: 9px 36px 9px 12px;
+    font-size: 13px; outline: none; transition: border-color .15s;
+    font-family: 'Geist', sans-serif;
+  }
+  .search input:focus { border-color: var(--signal); }
+  .search input::placeholder { color: var(--text-dim); }
+
+  .filter-tabs {
+    display: flex; gap: 0; padding: 0 16px 10px; flex-wrap: wrap;
+    border-bottom: 1px dashed var(--rule-soft); margin: 0 0 10px;
+  }
+  .filter-tabs button {
+    flex: 1; background: transparent; border: 0;
+    color: var(--text-dim); padding: 6px 4px; border-radius: 0;
+    font-size: 10px; cursor: pointer; transition: .15s;
+    text-transform: uppercase; letter-spacing: .12em; font-weight: 500;
+    border-bottom: 1px solid transparent;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .filter-tabs button:hover { color: var(--text); }
+  .filter-tabs button.active {
+    color: var(--signal); border-bottom-color: var(--signal);
+  }
+
+  .tag-filter {
+    padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 4px;
+    max-height: 72px; overflow-y: auto;
+  }
+  .tag-filter:not(:empty) { margin-bottom: 6px; }
+  .tag-chip {
+    font-size: 10px; padding: 3px 8px; border-radius: 2px;
+    background: transparent; color: var(--text-mid);
+    border: 1px solid var(--rule); cursor: pointer; transition: .15s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tag-chip.active {
+    background: var(--signal); color: var(--ink); border-color: var(--signal);
+  }
+  .tag-chip:hover:not(.active) { color: var(--signal); border-color: var(--signal); }
+
+  .project-list { flex: 1; overflow-y: auto; padding: 4px 12px 8px; }
+  .project-item {
+    padding: 12px 14px; margin-bottom: 4px; border-radius: 4px;
+    cursor: pointer; border: 1px solid transparent; transition: all .18s;
+    background: transparent; position: relative;
+  }
+  .project-item::before {
+    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
+    width: 2px; background: transparent; border-radius: 2px;
+    transition: background .2s;
+  }
+  .project-item:hover { background: var(--ink); }
+  .project-item:hover::before { background: var(--rule); }
+  .project-item.active {
+    background: var(--ink);
+  }
+  .project-item.active::before { background: var(--signal); }
+  .project-item .pi-name {
+    font-family: 'Fraunces', serif; font-weight: 500;
+    font-size: 14px; line-height: 1.25; letter-spacing: -.01em;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    color: var(--text);
+  }
+  .project-item.active .pi-name { color: var(--text); }
+  .project-item .pi-meta {
+    font-size: 10px; color: var(--text-dim); margin-top: 6px;
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .04em;
+  }
+  .project-item .pi-tags {
+    margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .pi-tag {
+    font-size: 9px; padding: 1px 6px; border-radius: 2px;
+    background: transparent; color: var(--signal-bright);
+    border: 1px solid rgba(232,163,61,.25);
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .04em;
+  }
+  .progress-mini {
+    height: 2px; background: var(--rule-soft); border-radius: 2px;
+    margin-top: 8px; overflow: hidden;
+  }
+  .progress-mini .bar {
+    height: 100%; background: var(--signal); transition: width .4s ease;
+  }
+
+  /* ===== PILLS / BADGES ===== */
+  .pill {
+    font-size: 9px; padding: 2px 7px; border-radius: 2px;
+    background: transparent; color: var(--text-dim); border: 1px solid var(--rule);
+    white-space: nowrap; font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase; letter-spacing: .1em; font-weight: 500;
+  }
+  .pill.status-ativo {
+    background: rgba(125,169,130,.1); color: var(--sage);
+    border-color: rgba(125,169,130,.35);
+  }
+  .pill.status-pausado {
+    background: rgba(232,163,61,.1); color: var(--signal);
+    border-color: rgba(232,163,61,.35);
+  }
+  .pill.status-concluido {
+    background: rgba(198,107,61,.1); color: var(--terra);
+    border-color: rgba(198,107,61,.35);
+  }
+  .pill.status-arquivado { color: var(--text-dim); }
+  .pill.deadline-soon {
+    background: rgba(232,163,61,.1); color: var(--signal);
+    border-color: rgba(232,163,61,.35);
+  }
+  .pill.deadline-late {
+    background: rgba(201,56,56,.1); color: var(--crimson);
+    border-color: rgba(201,56,56,.4);
+  }
+  .pill.deadline-ok { color: var(--sage); border-color: rgba(125,169,130,.3); }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    background: var(--signal); color: var(--ink); border: 1px solid var(--signal);
+    padding: 9px 14px; border-radius: 4px; font-size: 12px;
+    cursor: pointer; font-weight: 600; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    font-family: 'Geist', sans-serif;
+  }
+  .btn:hover {
+    background: var(--signal-bright); border-color: var(--signal-bright);
+    transform: translateY(-1px);
+  }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary {
+    background: var(--ink-2); color: var(--text);
+    border: 1px solid var(--rule);
+  }
+  .btn.secondary:hover { background: var(--ink-3); border-color: var(--text-dim); }
+  .btn.ghost {
+    background: transparent; color: var(--text-mid);
+    border: 1px solid var(--rule);
+  }
+  .btn.ghost:hover { color: var(--signal); border-color: var(--signal); background: rgba(232,163,61,.05); }
+  .btn.danger {
+    background: transparent; color: var(--crimson);
+    border: 1px solid rgba(201,56,56,.4);
+  }
+  .btn.danger:hover { background: rgba(201,56,56,.1); border-color: var(--crimson); }
+  .btn.sm { padding: 5px 10px; font-size: 10px; letter-spacing: .1em; }
+  .btn.icon { padding: 7px 9px; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .sidebar-footer {
+    padding: 12px 14px; border-top: 1px solid var(--rule-soft);
+    display: flex; gap: 4px; flex-wrap: wrap;
+    background: var(--ink);
+  }
+  .sidebar-footer .btn { padding: 7px 9px; font-size: 13px; border-radius: 3px; }
+
+  /* ===== MAIN ===== */
+  main {
+    overflow-y: auto; height: 100vh; padding: 36px 48px 80px;
+    background: var(--bg);
+    position: relative;
+  }
+  main > * { max-width: 1100px; margin-left: auto; margin-right: auto; }
+
+  .empty {
+    height: 100%; display: grid; place-items: center;
+    text-align: center; color: var(--text-dim);
+    max-width: none;
+  }
+  .empty-inner { max-width: 460px; }
+  .empty-mark {
+    width: 120px; height: 120px; margin: 0 auto 32px;
+    color: var(--signal); opacity: .85;
+  }
+  .empty-mark svg { width: 100%; height: 100%; }
+  .empty .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: .25em; text-transform: uppercase;
+    color: var(--signal); margin-bottom: 14px;
+  }
+  .empty h2 {
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 400;
+    font-size: 38px; line-height: 1.05; margin: 0 0 14px;
+    color: var(--text); letter-spacing: -.02em;
+  }
+  .empty p {
+    font-size: 14px; line-height: 1.55; color: var(--text-mid);
+    max-width: 380px; margin: 0 auto 24px;
+  }
+  .empty .hint {
+    margin-top: 20px; font-size: 11px; color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .05em;
+  }
+
+  /* ===== PROJECT HEADER ===== */
+  .project-header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
+    margin-bottom: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule-soft);
+    position: relative;
+  }
+  .project-header::before {
+    content: ''; position: absolute; left: 0; bottom: -1px; width: 80px; height: 2px;
+    background: var(--signal);
+  }
+  .project-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: .25em; text-transform: uppercase;
+    color: var(--signal); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .project-eyebrow::after {
+    content: ''; flex: 1; height: 1px; background: var(--rule); max-width: 80px;
+  }
+  .project-title {
+    font-family: 'Fraunces', serif;
+    font-style: italic; font-weight: 500;
+    font-size: 42px; line-height: 1.05; letter-spacing: -.025em;
+    margin: 0; color: var(--text);
+  }
+  .project-title[contenteditable="true"]:focus {
+    outline: none;
+    background: linear-gradient(180deg, transparent 88%, rgba(232,163,61,.15) 88%);
+    border-radius: 0; padding: 0 2px;
+  }
+  .project-meta-row {
+    display: flex; gap: 0; flex-wrap: wrap;
+    color: var(--text-dim); font-size: 12px; margin-top: 16px;
+    align-items: center;
+  }
+  .project-meta-row .meta-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 14px 4px 0; margin-right: 14px;
+    border-right: 1px solid var(--rule-soft);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-mid); letter-spacing: .03em;
+  }
+  .project-meta-row .meta-item:last-child { border-right: 0; }
+  .project-meta-row input, .project-meta-row select {
+    background: transparent; border: 1px solid transparent;
+    color: var(--text); border-radius: 3px; padding: 2px 6px;
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    transition: border-color .15s;
+    cursor: pointer;
+  }
+  .project-meta-row input:hover, .project-meta-row select:hover {
+    border-color: var(--rule);
+  }
+  .project-meta-row input:focus, .project-meta-row select:focus {
+    outline: none; border-color: var(--signal);
+  }
+  .project-meta-row select {
+    appearance: none; padding-right: 18px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+                      linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 9px) 50%, calc(100% - 5px) 50%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+  }
+
+  .tags-row {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; align-items: center;
+  }
+  .tags-row .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; padding: 3px 9px; border-radius: 2px;
+    background: rgba(232,163,61,.08); color: var(--signal);
+    border: 1px solid rgba(232,163,61,.3); display: inline-flex; align-items: center; gap: 6px;
+    letter-spacing: .04em;
+  }
+  .tags-row .tag button {
+    background: transparent; border: 0; color: inherit; cursor: pointer;
+    padding: 0; font-size: 14px; line-height: 1; opacity: .5;
+    transition: opacity .15s;
+  }
+  .tags-row .tag button:hover { opacity: 1; }
+  .tags-row input {
+    background: transparent; border: 1px dashed var(--rule);
+    border-radius: 2px; color: var(--text); padding: 3px 9px;
+    font-size: 10px; width: 110px; outline: none;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .04em;
+    transition: all .15s;
+  }
+  .tags-row input:focus { border-style: solid; border-color: var(--signal); color: var(--signal); }
+
+  /* ===== INTELLIGENCE PANEL (bento stats) ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 1px;
+    margin-bottom: 24px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .stat {
+    background: var(--bg-elev); padding: 22px 24px;
+    position: relative;
+    transition: background .2s;
+  }
+  .stat:hover { background: var(--ink-2); }
+  .stat .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: .2em;
+    margin-bottom: 10px;
+  }
+  .stat .value {
+    font-family: 'Fraunces', serif;
+    font-size: 32px; font-weight: 500;
+    margin-top: 0; color: var(--text);
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+  .stat.hero {
+    background: var(--ink-2);
+    display: flex; flex-direction: column; justify-content: space-between;
+    min-height: 140px;
+  }
+  .stat.hero .label { color: var(--signal); }
+  .stat.hero .value {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 88px; font-weight: 400;
+    color: var(--signal); line-height: .95;
+    letter-spacing: -.04em;
+  }
+  .stat.hero .value .pct { font-size: 36px; font-style: normal; opacity: .6; margin-left: 4px; vertical-align: top; }
+  .stat .sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+    margin-top: 6px; letter-spacing: .05em;
+  }
+
+  /* ===== PHASE PROGRESS STRIP ===== */
+  .phase-strip {
+    display: flex; gap: 3px; margin-bottom: 32px;
+    padding: 16px 0;
+  }
+  .phase-segment {
+    flex: 1; height: 28px; position: relative;
+    background: var(--ink-2); border: 1px solid var(--rule-soft);
+    border-radius: 2px; overflow: hidden;
+    transition: all .2s; cursor: pointer;
+    display: flex; align-items: flex-end;
+  }
+  .phase-segment:hover { border-color: var(--signal); }
+  .phase-segment .fill {
+    width: 100%; background: var(--signal); transition: height .4s ease;
+  }
+  .phase-segment.complete .fill { background: var(--signal); }
+  .phase-segment.complete { border-color: var(--signal); }
+  .phase-segment .num {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-dim); pointer-events: none;
+    mix-blend-mode: difference; opacity: .9;
+  }
+  .phase-segment.complete .num { color: var(--ink); mix-blend-mode: normal; }
+
+  /* old progress block — repurposed as fallback (hidden when bento renders) */
+  .progress-block { display: none; }
+  .progress-bar-wrap { flex: 1; }
+  .progress-bar {
+    height: 8px; background: var(--ink-2); border-radius: 2px; overflow: hidden;
+    border: 1px solid var(--rule-soft);
+  }
+  .progress-bar .bar { height: 100%; background: var(--signal); transition: width .4s ease; }
+  .progress-info {
+    font-size: 11px; color: var(--text-dim); margin-top: 8px;
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .05em;
+  }
+  .progress-pct {
+    font-family: 'Fraunces', serif; font-style: italic;
+    font-size: 36px; font-weight: 500; min-width: 80px; text-align: right;
+    color: var(--signal); letter-spacing: -.02em;
+  }
+
+  /* ===== CHECKLIST ===== */
+  .checklist {
+    background: var(--bg-elev); border: 1px solid var(--rule-soft);
+    border-radius: var(--radius-lg); overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .group-block { position: relative; }
+  .group-block + .group-block { border-top: 1px solid var(--rule-soft); }
+  .group-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 26px 18px; background: var(--bg-elev);
+    cursor: pointer; user-select: none;
+    transition: background .15s;
+  }
+  .group-header:hover { background: var(--ink-2); }
+  .group-header .group-info {
+    display: flex; align-items: baseline; gap: 16px; min-width: 0; flex: 1;
+  }
+  .phase-num {
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 400;
+    font-size: 32px; color: var(--signal);
+    line-height: 1; letter-spacing: -.04em; flex-shrink: 0;
+    width: 48px; text-align: right;
+    font-feature-settings: "lnum";
+  }
+  .phase-text { min-width: 0; flex: 1; }
+  .phase-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    letter-spacing: .2em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .phase-title {
+    font-family: 'Fraunces', serif; font-weight: 500;
+    font-size: 18px; line-height: 1.2;
+    color: var(--text); letter-spacing: -.01em;
+    display: inline;
+  }
+  .phase-title[contenteditable="true"]:focus {
+    outline: 1px solid var(--signal); outline-offset: 2px;
+    border-radius: 2px;
+  }
+  .group-header .right { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+  .group-header .chev {
+    transition: transform .2s; color: var(--text-dim);
+    font-size: 10px; opacity: .6;
+  }
+  .group-header.collapsed .chev { transform: rotate(-90deg); }
+  .group-header .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-mid);
+    background: transparent;
+    padding: 3px 8px; border-radius: 2px;
+    border: 1px solid var(--rule); letter-spacing: .05em;
+  }
+  .group-block.complete .count {
+    color: var(--sage); border-color: rgba(125,169,130,.4);
+    background: rgba(125,169,130,.08);
+  }
+  .group-block.complete .phase-num {
+    color: var(--sage);
+  }
+
+  .group-items { background: var(--bg-elev); }
+  .group-items.collapsed { display: none; }
+
+  /* CHECKLIST ITEM — the protagonist */
+  .check-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 26px 14px 90px;
+    border-top: 1px solid var(--rule-soft);
+    transition: background .15s;
+    position: relative;
+  }
+  .check-item:hover { background: var(--ink-2); }
+  .check-item.done .item-text {
+    color: var(--text-dim); position: relative;
+  }
+  .check-item.done .item-text::after {
+    content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px;
+    background: var(--text-dim); transform-origin: left;
+    animation: strike .35s cubic-bezier(.5,.5,.3,1) forwards;
+  }
+  @keyframes strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* Custom checkbox — stamp style */
+  .check-item input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 20px; height: 20px; margin: 1px 0 0 0;
+    border: 1.5px solid var(--rule); border-radius: 3px;
+    background: transparent; cursor: pointer; flex-shrink: 0;
+    position: relative; transition: all .2s;
+  }
+  .check-item input[type="checkbox"]:hover {
+    border-color: var(--signal);
+  }
+  .check-item input[type="checkbox"]:checked {
+    background: var(--signal); border-color: var(--signal);
+    transform: scale(1);
+    animation: stamp .25s ease-out;
+  }
+  @keyframes stamp {
+    0% { transform: scale(.85); }
+    60% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  .check-item input[type="checkbox"]:checked::after {
+    content: ''; position: absolute;
+    left: 5px; top: 1px;
+    width: 6px; height: 11px;
+    border: solid var(--ink);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    animation: drawCheck .2s ease-out .05s both;
+  }
+  @keyframes drawCheck {
+    from { opacity: 0; transform: rotate(45deg) scale(.5); }
+    to   { opacity: 1; transform: rotate(45deg) scale(1); }
+  }
+
+  .item-body { flex: 1; min-width: 0; }
+  .item-text {
+    font-family: 'Geist', sans-serif;
+    font-size: 14.5px; line-height: 1.55; color: var(--text);
+    letter-spacing: -.005em;
+  }
+  .item-text[contenteditable="true"]:focus {
+    outline: none;
+    background: linear-gradient(180deg, transparent 88%, rgba(232,163,61,.18) 88%);
+    border-radius: 0; padding: 0 2px;
+  }
+
+  .item-note {
+    margin-top: 10px; background: var(--ink);
+    border: 1px solid var(--rule-soft); border-left: 2px solid var(--signal);
+    border-radius: 0; padding: 10px 12px;
+    font-size: 13px; color: var(--text-mid);
+    width: 100%; resize: vertical; min-height: 36px;
+    font-family: 'Geist', sans-serif; display: none;
+    line-height: 1.5;
+  }
+  .item-note:focus { outline: none; border-color: var(--signal); border-left-color: var(--signal); color: var(--text); }
+  .item-note.show { display: block; }
+
+  .attachments {
+    margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .attachment {
+    width: 64px; height: 64px; border-radius: 3px;
+    overflow: hidden; cursor: pointer; position: relative;
+    border: 1px solid var(--rule);
+    transition: all .2s;
+  }
+  .attachment:hover { transform: translateY(-2px); border-color: var(--signal); }
+  .attachment img { width: 100%; height: 100%; object-fit: cover; }
+  .attachment .rm {
+    position: absolute; top: 3px; right: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(11,12,14,.85); color: var(--signal); border: 0;
+    cursor: pointer; font-size: 10px; line-height: 1;
+    display: none; backdrop-filter: blur(4px);
+  }
+  .attachment:hover .rm { display: block; }
+  .attachment-add {
+    width: 64px; height: 64px; border-radius: 3px;
+    border: 1px dashed var(--rule); display: grid; place-items: center;
+    color: var(--text-dim); cursor: pointer; font-size: 18px;
+    transition: all .2s;
+  }
+  .attachment-add:hover { border-color: var(--signal); color: var(--signal); }
+
+  .item-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+  .check-item:hover .item-actions { opacity: 1; }
+  .item-actions button {
+    background: transparent; border: 0; color: var(--text-dim);
+    cursor: pointer; padding: 4px 7px; font-size: 13px; border-radius: 2px;
+    transition: all .12s;
+  }
+  .item-actions button:hover { background: var(--ink-3); color: var(--signal); }
+
+  .add-item-row {
+    padding: 12px 26px 16px 90px;
+    border-top: 1px dashed var(--rule-soft);
+    background: var(--bg-elev);
+  }
+  .add-item-row input {
+    width: 100%; background: transparent; border: 0;
+    border-bottom: 1px dashed var(--rule);
+    color: var(--text); padding: 8px 4px; font-size: 13px; outline: none;
+    font-family: 'Geist', sans-serif;
+    transition: border-color .15s;
+  }
+  .add-item-row input:focus { border-bottom-color: var(--signal); border-style: solid; }
+  .add-item-row input::placeholder { color: var(--text-dim); }
+
+  .checklist-footer {
+    padding: 14px 26px;
+    border-top: 1px solid var(--rule-soft);
+    background: var(--ink);
+  }
+
+  /* ===== PANELS (notes / links / timeline) ===== */
+  .panel-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px;
+  }
+  .panel {
+    background: var(--bg-elev); border: 1px solid var(--rule-soft);
+    border-radius: var(--radius-lg); padding: 22px 24px;
+    position: relative;
+  }
+  .panel h3 {
+    margin: 0 0 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: .25em;
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 500;
+  }
+  .panel h3::after {
+    content: ''; flex: 1; height: 1px; background: var(--rule-soft);
+  }
+  .panel textarea {
+    width: 100%; min-height: 130px; resize: vertical;
+    background: var(--ink); border: 1px solid var(--rule-soft);
+    color: var(--text); border-radius: 4px; padding: 12px 14px;
+    font-family: 'Geist', sans-serif; font-size: 13px; outline: none;
+    line-height: 1.55;
+    transition: border-color .15s;
+  }
+  .panel textarea:focus { border-color: var(--signal); }
+  .panel textarea::placeholder { color: var(--text-dim); font-style: italic; }
+
+  .links-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .link-item {
+    display: flex; align-items: center; gap: 10px;
+    background: transparent; padding: 8px 12px; border-radius: 3px;
+    font-size: 12px; border: 1px solid var(--rule-soft);
+    transition: all .15s;
+  }
+  .link-item:hover { border-color: var(--rule); background: var(--ink); }
+  .link-item a {
+    color: var(--signal); text-decoration: none; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: 'Geist', sans-serif; font-weight: 500;
+  }
+  .link-item a:hover { color: var(--signal-bright); text-decoration: underline; text-underline-offset: 3px; }
+  .link-item button {
+    background: transparent; border: 0; color: var(--text-dim);
+    cursor: pointer; font-size: 12px;
+  }
+  .link-item button:hover { color: var(--crimson); }
+  .link-add { display: flex; gap: 6px; }
+  .link-add input {
+    flex: 1; background: var(--ink); border: 1px solid var(--rule-soft);
+    color: var(--text); border-radius: 3px; padding: 8px 10px; font-size: 12px; outline: none;
+    font-family: 'Geist', sans-serif;
+  }
+  .link-add input:focus { border-color: var(--signal); }
+
+  /* ===== TIMELINE ===== */
+  .timeline { max-height: 260px; overflow-y: auto; padding-left: 4px; }
+  .timeline-item {
+    padding: 8px 0 8px 18px;
+    font-size: 12px; color: var(--text-mid);
+    border-left: 1px solid var(--rule-soft);
+    margin-left: 6px; position: relative;
+    transition: border-color .15s;
+  }
+  .timeline-item:hover { border-left-color: var(--signal); }
+  .timeline-item::before {
+    content: ''; position: absolute; left: -5px; top: 14px;
+    width: 9px; height: 9px; background: var(--signal); border-radius: 50%;
+    border: 2px solid var(--bg-elev);
+  }
+  .timeline-item .ts {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    letter-spacing: .1em; text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .timeline-item.action-check::before { background: var(--sage); }
+  .timeline-item.action-uncheck::before { background: var(--text-dim); }
+  .timeline-item.action-add::before { background: var(--signal); }
+  .timeline-item.action-remove::before { background: var(--crimson); }
+  .timeline-item.action-edit::before { background: var(--terra); }
+  .timeline-item.action-create::before, .timeline-item.action-reset::before { background: var(--signal-bright); }
+
+  /* ===== MODALS ===== */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(11,12,14,.7);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+    padding: 16px;
+    animation: fadeBackdrop .25s ease-out;
+  }
+  @keyframes fadeBackdrop { from { opacity: 0; } to { opacity: 1; } }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--bg-elev); border: 1px solid var(--rule);
+    border-radius: var(--radius-lg); width: min(540px, 100%); padding: 32px;
+    box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto;
+    position: relative;
+    animation: slideUpModal .3s cubic-bezier(.22,.9,.32,1);
+  }
+  .modal::before {
+    content: ''; position: absolute; top: 0; left: 32px; right: 32px; height: 2px;
+    background: var(--signal);
+    border-radius: 0 0 2px 2px;
+  }
+  @keyframes slideUpModal {
+    from { opacity: 0; transform: translateY(20px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal.lg { width: min(720px, 100%); }
+  .modal h2 {
+    margin: 0 0 22px;
+    font-family: 'Fraunces', serif; font-style: italic;
+    font-weight: 500; font-size: 26px; letter-spacing: -.02em;
+    color: var(--text); line-height: 1.1;
+  }
+  .modal label {
+    display: block; margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: .2em;
+    margin-top: 14px;
+  }
+  .modal label:first-of-type { margin-top: 0; }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; background: var(--ink); border: 1px solid var(--rule-soft);
+    color: var(--text); border-radius: 4px; padding: 10px 12px; font-size: 13px;
+    margin-bottom: 4px; outline: none; font-family: 'Geist', sans-serif;
+    transition: border-color .15s;
+  }
+  .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--signal); }
+  .modal input::placeholder { color: var(--text-dim); }
+  .modal input[type="checkbox"] { width: auto; margin: 0 8px 0 0; accent-color: var(--signal); }
+  .modal textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+  .modal a { color: var(--signal); text-decoration: none; }
+  .modal a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .modal code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: var(--ink); padding: 1px 5px; border-radius: 2px;
+    border: 1px solid var(--rule-soft); color: var(--signal);
+  }
+  .modal-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 24px; flex-wrap: wrap;
+    padding-top: 20px; border-top: 1px solid var(--rule-soft);
+  }
+  .modal hr { border: 0; border-top: 1px solid var(--rule-soft); margin: 22px 0; }
+  .modal h3 {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important; color: var(--text-dim) !important;
+    text-transform: uppercase; letter-spacing: .2em; font-weight: 500;
+    margin-top: 16px; margin-bottom: 10px;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 32px; left: 50%;
+    transform: translate(-50%, 100px);
+    background: var(--ink-2); border: 1px solid var(--signal);
+    border-left: 3px solid var(--signal);
+    color: var(--text); border-radius: 4px;
+    padding: 12px 20px; font-size: 13px; box-shadow: var(--shadow);
+    opacity: 0; transition: all .35s cubic-bezier(.22,.9,.32,1);
+    z-index: 200; font-family: 'Geist', sans-serif; font-weight: 500;
+    letter-spacing: -.005em;
+    max-width: 90vw;
+  }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+  /* IMAGE VIEWER */
+  .img-viewer {
+    position: fixed; inset: 0;
+    background: rgba(11,12,14,.95);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 300; padding: 32px;
+  }
+  .img-viewer.show { display: flex; animation: fadeBackdrop .3s; }
+  .img-viewer img {
+    max-width: 100%; max-height: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.8);
+    border: 1px solid var(--rule);
+  }
+  .img-viewer .close-btn {
+    position: absolute; top: 28px; right: 28px;
+    background: var(--ink-2); color: var(--signal);
+    border: 1px solid var(--rule);
+    width: 40px; height: 40px; border-radius: 50%;
+    cursor: pointer; font-size: 16px;
+    transition: all .2s;
+  }
+  .img-viewer .close-btn:hover { background: var(--signal); color: var(--ink); border-color: var(--signal); }
+
+  /* DAILY VIEW */
+  .daily-header {
+    margin-bottom: 28px; padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule-soft);
+    position: relative;
+  }
+  .daily-header::before {
+    content: ''; position: absolute; left: 0; bottom: -1px; width: 80px; height: 2px;
+    background: var(--signal);
+  }
+  .daily-header .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: .25em; text-transform: uppercase;
+    color: var(--signal); margin-bottom: 10px;
+  }
+  .daily-header h2 {
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 500;
+    font-size: 42px; margin: 0;
+    letter-spacing: -.025em; line-height: 1.05;
+    color: var(--text);
+  }
+  .daily-header p {
+    color: var(--text-mid); font-size: 13px; margin: 14px 0 0;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .03em;
+  }
+  .daily-project {
+    background: var(--bg-elev); border: 1px solid var(--rule-soft);
+    border-radius: var(--radius-lg); margin-bottom: 14px; overflow: hidden;
+    transition: border-color .2s;
+  }
+  .daily-project:hover { border-color: var(--rule); }
+  .daily-project-header {
+    padding: 16px 22px; background: var(--bg-elev);
+    font-family: 'Fraunces', serif; font-weight: 500;
+    font-size: 15px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--rule-soft);
+    transition: background .15s; color: var(--text);
+  }
+  .daily-project-header:hover { background: var(--ink-2); color: var(--signal); }
+  .daily-project-header .right {
+    display: flex; gap: 12px; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim); letter-spacing: .08em;
+    text-transform: uppercase; font-weight: 500;
+  }
+  .daily-project .check-item { padding-left: 26px; }
+  .daily-project .check-item .item-text { font-size: 14px; }
+
+  /* SHORTCUTS HELP */
+  .shortcuts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+  .shortcut-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; font-size: 13px; color: var(--text-mid);
+    border-bottom: 1px dashed var(--rule-soft);
+  }
+  kbd {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--ink); color: var(--signal);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 2px 7px; font-size: 11px;
+    box-shadow: 0 1px 0 var(--rule), inset 0 -1px 0 rgba(0,0,0,.3);
+    font-weight: 500; min-width: 22px; text-align: center;
+    display: inline-block;
+  }
+
+  /* TEMPLATES LIST */
+  .template-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--ink);
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px; margin-bottom: 6px; font-size: 13px;
+    transition: border-color .15s;
+  }
+  .template-row:hover { border-color: var(--rule); }
+  .template-row .name {
+    flex: 1; font-family: 'Fraunces', serif; font-weight: 500;
+    color: var(--text);
+  }
+  .template-row .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; background: var(--signal); color: var(--ink);
+    padding: 2px 7px; border-radius: 2px; text-transform: uppercase;
+    letter-spacing: .15em; font-weight: 600;
+  }
+
+  /* DEADLINE BANNER */
+  .deadline-banner {
+    padding: 14px 18px; border-radius: 4px; font-size: 13px;
+    margin-bottom: 24px; display: flex; align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .04em;
+    border-left: 3px solid;
+  }
+  .deadline-banner.late {
+    background: rgba(201,56,56,.08); border-color: var(--crimson); color: var(--crimson);
+  }
+  .deadline-banner.soon {
+    background: rgba(232,163,61,.08); border-color: var(--signal); color: var(--signal);
+  }
+  .deadline-banner.ok {
+    background: rgba(125,169,130,.06); border-color: var(--sage); color: var(--sage);
+  }
+
+  /* footer ID strip */
+  .id-strip {
+    text-align: center; margin-top: 40px;
+    color: var(--text-dim); font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .1em;
+    padding-top: 28px; border-top: 1px dashed var(--rule-soft);
+  }
+  .id-strip .sep { color: var(--rule); margin: 0 8px; }
+
+  @media (max-width: 880px) {
+    body { grid-template-columns: 1fr; }
+    aside { position: fixed; inset: 0; z-index: 50; transform: translateX(-100%); transition: .25s; }
+    aside.mobile-open { transform: translateX(0); }
+    main { padding: 24px 20px; }
+    main > * { max-width: none; }
+    .panel-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr; }
+    .stat.hero .value { font-size: 64px; }
+    .project-title { font-size: 32px; }
+    .check-item { padding-left: 26px; padding-right: 16px; }
+    .add-item-row { padding-left: 26px; }
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--signal); }
+  ::selection { background: var(--signal); color: var(--ink); }
+
+  /* link in sync modal description */
+  .modal-desc {
+    font-size: 12px; color: var(--text-mid);
+    margin-bottom: 16px; line-height: 1.55;
+  }
+
+  /* date inputs in dark theme look better */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(.7) sepia(1) saturate(3) hue-rotate(360deg);
+    cursor: pointer;
+  }
+  [data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+  [data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none;
+  }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="6.5"/>
+          <line x1="11" y1="4" x2="11" y2="8"/>
+          <line x1="11" y1="14" x2="11" y2="18"/>
+          <line x1="4" y1="11" x2="8" y2="11"/>
+          <line x1="14" y1="11" x2="18" y2="11"/>
+          <circle cx="11" cy="11" r="1.5" fill="currentColor"/>
+        </svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <h1>Dossiê</h1>
+        <small id="brandSubtitle">Análise · Concorrente</small>
+      </div>
+      <div class="sync-dot" id="syncDot" title="Sync status"></div>
+    </div>
+
+    <div class="view-tabs">
+      <button id="viewProjects" class="active" onclick="setView('project')">Casos</button>
+      <button id="viewDaily" onclick="setView('daily')">Rotina</button>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="btn" style="flex:1" onclick="openNewProjectModal()">+ Novo projeto</button>
+    </div>
+
+    <div class="search">
+      <input id="searchInput" type="text" placeholder="Buscar (atalho: /)..." oninput="renderProjectList()" />
+    </div>
+
+    <div class="filter-tabs">
+      <button class="active" data-filter="todos" onclick="setFilter('todos')">Todos</button>
+      <button data-filter="ativo" onclick="setFilter('ativo')">Ativos</button>
+      <button data-filter="pausado" onclick="setFilter('pausado')">Pausados</button>
+      <button data-filter="concluido" onclick="setFilter('concluido')">Feitos</button>
+    </div>
+
+    <div class="tag-filter" id="tagFilter"></div>
+
+    <div class="project-list" id="projectList"></div>
+
+    <div class="sidebar-footer">
+      <button class="btn ghost sm" onclick="openTemplatesModal()" title="Templates">📑</button>
+      <button class="btn ghost sm" onclick="openSyncModal()" title="Sync GitHub Gist">☁️</button>
+      <button class="btn ghost sm" onclick="openSettingsModal()" title="Configurações">⚙️</button>
+      <button class="btn ghost sm" onclick="openShortcutsModal()" title="Atalhos (?)">⌨️</button>
+      <button class="btn ghost sm" onclick="exportData()" title="Exportar JSON">⬇</button>
+      <button class="btn ghost sm" onclick="document.getElementById('importFile').click()" title="Importar JSON">⬆</button>
+      <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)" />
+      <button class="btn ghost sm" onclick="toggleTheme()" title="Tema">🌓</button>
+      <button class="btn ghost sm" id="installBtn" style="display:none" onclick="installPwa()" title="Instalar app">📱</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div class="empty" id="emptyState">
+      <div class="empty-inner">
+        <div class="empty-mark" aria-hidden="true">
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- folder back -->
+            <path d="M18 32 h36 l8 8 h40 v60 h-84 z" fill="rgba(232,163,61,.05)" stroke-width="1.5"/>
+            <!-- folder lines (documents inside) -->
+            <line x1="32" y1="56" x2="76" y2="56" opacity=".5"/>
+            <line x1="32" y1="64" x2="88" y2="64" opacity=".5"/>
+            <line x1="32" y1="72" x2="68" y2="72" opacity=".5"/>
+            <line x1="32" y1="80" x2="80" y2="80" opacity=".5"/>
+            <!-- crosshair / target overlay -->
+            <circle cx="84" cy="40" r="14" stroke-dasharray="2 3" opacity=".7"/>
+            <circle cx="84" cy="40" r="4"/>
+            <line x1="84" y1="20" x2="84" y2="28"/>
+            <line x1="84" y1="52" x2="84" y2="60"/>
+            <line x1="64" y1="40" x2="72" y2="40"/>
+            <line x1="96" y1="40" x2="104" y2="40"/>
+          </svg>
+        </div>
+        <div class="eyebrow">Arquivo · Vazio</div>
+        <h2>Nenhum dossiê <em>aberto</em>.</h2>
+        <p>Comece um caso novo pra rastrear a análise de um concorrente passo a passo. Cada projeto reproduz o checklist de 71 itens em 13 fases.</p>
+        <button class="btn" onclick="openNewProjectModal()">Abrir novo caso</button>
+        <div class="hint">Aperte <kbd>N</kbd> pra novo · <kbd>?</kbd> pra atalhos</div>
+      </div>
+    </div>
+    <div id="projectView" style="display:none"></div>
+    <div id="dailyView" style="display:none"></div>
+  </main>
+
+  <!-- Modal: Novo Projeto -->
+  <div class="modal-backdrop" id="newProjectModal">
+    <div class="modal">
+      <h2>Novo caso · Análise de concorrente</h2>
+      <label>Nome do projeto * (sugestão: [Expert] — DD/MM/AAAA)</label>
+      <input id="np_name" type="text" placeholder="Ex: BlueHackers — 13/05/2026" />
+      <label>Template</label>
+      <select id="np_template"></select>
+      <label>Nicho / vertical</label>
+      <input id="np_niche" type="text" placeholder="Ex: Saúde, finanças, beleza..." />
+      <label>Tipo de funil</label>
+      <select id="np_platform">
+        <option value="">— Identificar depois —</option>
+        <option>VSL</option>
+        <option>Webinar / lançamento</option>
+        <option>Quiz</option>
+        <option>Página de vendas textual</option>
+        <option>Híbrido</option>
+      </select>
+      <label>Tags (separadas por vírgula)</label>
+      <input id="np_tags" type="text" placeholder="Ex: ganhador, replicar, observar" />
+      <label>Deadline (opcional)</label>
+      <input id="np_deadline" type="date" />
+      <label>Domínio / link do concorrente</label>
+      <input id="np_desc" type="text" placeholder="https://exemplo.com.br" />
+      <div class="modal-actions">
+        <button class="btn ghost" onclick="closeModal('newProjectModal')">Cancelar</button>
+        <button class="btn" onclick="createProject()">Criar projeto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Templates -->
+  <div class="modal-backdrop" id="templatesModal">
+    <div class="modal lg">
+      <h2>Templates de checklist</h2>
+      <div class="modal-desc">
+        Cada caso novo nasce a partir de um template. Você pode ter vários — por exemplo, "Análise rápida" ou "Auditoria completa".
+      </div>
+      <div id="templatesList"></div>
+      <button class="btn secondary sm" onclick="newTemplate()" style="margin-top:8px">+ Novo template</button>
+      <hr />
+      <div id="templateEditor" style="display:none">
+        <label>Nome do template</label>
+        <input id="tpl_name" type="text" />
+        <label>Conteúdo (use <code>## Grupo</code> para criar grupos)</label>
+        <textarea id="tpl_content" style="min-height:280px;font-family:monospace;font-size:12px"></textarea>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <input type="checkbox" id="tpl_default" />
+          <label for="tpl_default" style="display:inline;margin:0">Marcar como template padrão</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn danger sm" onclick="deleteCurrentTemplate()">Excluir</button>
+          <button class="btn ghost" onclick="hideTemplateEditor()">Voltar</button>
+          <button class="btn" onclick="saveCurrentTemplate()">Salvar</button>
+        </div>
+      </div>
+      <div class="modal-actions" id="templatesModalFooter">
+        <button class="btn ghost" onclick="closeModal('templatesModal')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Sync -->
+  <div class="modal-backdrop" id="syncModal">
+    <div class="modal">
+      <h2>Sync · GitHub Gist</h2>
+      <div class="modal-desc">
+        Salva seus projetos num Gist privado pra acessar de qualquer máquina. Precisa de um Personal Access Token do GitHub com permissão <code>gist</code>.
+        <br /><a href="https://github.com/settings/tokens/new?scopes=gist&description=Spy%20Projects%20App" target="_blank">Criar token →</a>
+      </div>
+      <label>GitHub Personal Access Token</label>
+      <input id="sync_token" type="password" placeholder="ghp_..." autocomplete="off" />
+      <label>Gist ID (deixe vazio pra criar novo)</label>
+      <input id="sync_gistid" type="text" placeholder="ex: a1b2c3d4..." />
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+        <input type="checkbox" id="sync_auto" />
+        <label for="sync_auto" style="display:inline;margin:0">Sincronizar automaticamente ao mudar (debounce 5s)</label>
+      </div>
+      <div id="syncStatus" style="font-size:12px;color:var(--text-dim);margin-bottom:10px"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" onclick="closeModal('syncModal')">Fechar</button>
+        <button class="btn secondary" onclick="saveSyncSettings()">Salvar config</button>
+        <button class="btn secondary" onclick="syncPull()">⬇ Puxar do Gist</button>
+        <button class="btn" onclick="syncPush()">⬆ Enviar pro Gist</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Settings (notifications) -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal">
+      <h2>Configurações</h2>
+      <h3>Lembretes</h3>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <input type="checkbox" id="notif_enabled" />
+        <label for="notif_enabled" style="display:inline;margin:0">Ativar notificações do navegador</label>
+      </div>
+      <label>Horário do lembrete diário</label>
+      <input id="notif_time" type="time" value="09:00" />
+      <label>Mensagem (opcional)</label>
+      <input id="notif_msg" type="text" placeholder="Você tem tarefas pendentes nos projetos de spy" />
+      <div style="font-size:11px;color:var(--text-dim);margin-top:-4px;margin-bottom:14px">
+        ⚠️ Funciona apenas com a aba aberta. Pra notificações em background, instale como PWA (📱).
+      </div>
+      <hr />
+      <h3>Comportamento</h3>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+        <input type="checkbox" id="set_autocollapse" />
+        <label for="set_autocollapse" style="display:inline;margin:0">Colapsar grupos automaticamente quando 100% concluídos</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" onclick="closeModal('settingsModal')">Cancelar</button>
+        <button class="btn" onclick="saveSettings()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Shortcuts -->
+  <div class="modal-backdrop" id="shortcutsModal">
+    <div class="modal">
+      <h2>Atalhos de teclado</h2>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><span>Novo projeto</span><kbd>N</kbd></div>
+        <div class="shortcut-row"><span>Buscar projetos</span><kbd>/</kbd></div>
+        <div class="shortcut-row"><span>Alternar projetos/rotina</span><kbd>D</kbd></div>
+        <div class="shortcut-row"><span>Templates</span><kbd>T</kbd></div>
+        <div class="shortcut-row"><span>Configurações</span><kbd>,</kbd></div>
+        <div class="shortcut-row"><span>Sync</span><kbd>Ctrl</kbd>+<kbd>S</kbd></div>
+        <div class="shortcut-row"><span>Próximo projeto</span><kbd>↓</kbd></div>
+        <div class="shortcut-row"><span>Projeto anterior</span><kbd>↑</kbd></div>
+        <div class="shortcut-row"><span>Ajuda</span><kbd>?</kbd></div>
+        <div class="shortcut-row"><span>Fechar modal</span><kbd>Esc</kbd></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('shortcutsModal')">Ok</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="img-viewer" id="imgViewer" onclick="closeImgViewer()">
+    <button class="close-btn" onclick="closeImgViewer()">✕</button>
+    <img id="imgViewerImg" />
+  </div>
+
+<script>
+/* =========================================================
+   Spy Projects — single-file app
+   Persiste em localStorage. Sync opcional via GitHub Gist.
+   ========================================================= */
+
+const STORAGE_KEY = 'spy_projects_v2';
+const SETTINGS_KEY = 'spy_settings_v2';
+const THEME_KEY = 'spy_theme_v1';
+
+const DEFAULT_TEMPLATE_CONTENT = `## FASE 1 — Setup (~5min)
+Abrir Miro e copiar o modelo padrão pra um novo board
+Renomear o board: [Nome do expert] — [DD/MM/AAAA]
+Abrir Drive e criar pasta: Espionagem — [Nome do expert] — [MMM/AAAA]
+Criar 6 subpastas: /ads, /funil, /paginas, /trafego, /analises-ia, /transcricoes
+
+## FASE 2 — Rodar a skill (~10-20min)
+Abrir Claude e rodar /espionagem https://[dominio-do-concorrente]
+Esperar terminar (5-15 min — a skill faz 30+ chamadas Firecrawl)
+Copiar o output completo (as 15 partes)
+Salvar como dossie-bruto.md em /analises-ia
+Ler o dossiê inteiro de cabo a rabo
+Anotar numa lista à parte tudo que veio como não identificado
+
+## FASE 3 — Prints no Miro (~30min)
+Achar foto/logo do expert, print, colar no Miro na seção "Visão Rápida"
+Preencher empresa, nicho, produtos, trajetória (Partes 1, 2 e 11 do dossiê)
+Abrir link da Ads Library (Parte 14B), print da grid, colar no Miro
+Embaixo do print, colar o link da biblioteca
+
+## FASE 4 — Baixar criativos (~30-60min)
+Identificar ads com mais dias ativos (>30 dias OU múltiplas variações A/B) na Parte 14B
+Baixar cada um (sniptik, snapsave ou DevTools)
+Renomear no padrão: [expert]-ad-[N]-[dias]d.mp4
+Mover todos pra /ads no Drive
+Tirar print da thumb de cada criativo
+Colar as thumbs no Miro em grid
+Embaixo de cada thumb no Miro: link do Drive, dias ativos, formato
+
+## FASE 5 — Baixar peças do funil (~30-60min)
+Identificar tipo de funil (VSL / webinar / quiz / página textual / híbrido)
+Listar todas as peças centrais do funil (Parte 12 do dossiê — quais são as de conversão)
+Baixar/salvar cada peça conforme o tipo (vídeo, gravação, quiz screenshots, HTML)
+Renomear: [expert]-[tipo]-[slug-da-pagina]
+Mover tudo pra /funil no Drive
+
+## FASE 6 — Dados de tráfego (~20min)
+Abrir SemRush e buscar domínio do concorrente
+Printar todas as métricas: visitas/mês, visitantes mensais, views/página, exclusivos, taxa rejeição, páginas/visita, duração média
+Repetir tudo no SimilarWeb
+Salvar todos os prints em /trafego no Drive
+Colar os prints no Miro ao lado da seção de funil
+Calcular conversão estimada por página (visitas vs vendas) e anotar no Miro
+
+## FASE 7 — Comprimir e transcrever (~1-3h)
+Comprimir todos os vídeos de /ads no HandBrake (preset Fast 1080p30)
+Comprimir todos os vídeos de /funil (VSLs, webinars, lives gravadas)
+Transcrever todos os ads (Whisper / Descript / Turboscribe)
+Transcrever todas as peças em vídeo do funil (VSLs, webinars, lives)
+Para peças NÃO-vídeo (quiz, página textual): extrair conteúdo em texto
+Salvar transcrições/conteúdos em /transcricoes com mesmo nome do original + .txt
+Conferir: tudo está no Drive? Nada ficou só no PC?
+
+## FASE 8 — Análise dos criativos com IA (~1-2h)
+Criar documento novo no Word: analise-criativos.docx
+Pra cada criativo, criar entrada com: thumb, formato, personagem, link Drive, dias ativos
+Pra cada transcrição, jogar na IA pedindo: estrutura em 4 partes (Hook 0-3s / Pós-hook 3-15s / Corpo / CTA), gatilhos mentais, tipo de hook, 2 variações A/B
+Colar a resposta da IA na entrada correspondente do Word
+Salvar analise-criativos.docx em /analises-ia
+
+## FASE 9 — Análise do funil com IA (~1-2h)
+Pra cada peça central, printar a capa/thumb/header e colar no Miro
+Jogar o conteúdo (transcrição, texto ou perguntas) na IA com contexto do produto (Parte 8 do dossiê)
+Pedir UMA frase representativa por parte estrutural: abertura, problema, agitação, solução, prova, oferta, garantia, urgência, fechamento
+Colar as frases no Miro embaixo da capa da peça
+Adicionar link da peça no Miro
+Salvar análise completa como analise-funil-[nome-da-peca].docx em /analises-ia
+Repetir para cada peça central do funil
+
+## FASE 10 — Análise das páginas com IA (~1-2h)
+Pra cada página listada na Parte 12, subir HTML/markdown na IA
+Pedir à IA: estrutura da página (seções em ordem), observações, 3 insights replicáveis, cópia integral da copy
+Colar estrutura + observações + insights no Miro (embaixo do print da página)
+Salvar análise consolidada como analise-paginas.docx em /analises-ia
+Salvar toda a copy extraída em copy-paginas.docx em /analises-ia
+
+## FASE 11 — Montagem final do Miro (~1-2h)
+Conferir: todas as páginas do funil têm print + URL + estrutura + insights + tráfego?
+Conectar as páginas com setas seguindo o fluxo (use diagrama da Parte 14 do dossiê)
+Conferir: todos os criativos estão no Miro com thumb + link + dias ativos?
+Conferir: todas as peças centrais do funil têm capa + frases estruturais + link?
+Criar seção "Análise de Funil" descrevendo em palavras o que o fluxo faz
+Pedir à IA pra gerar gráfico de fontes de tráfego (dados SemRush/SimilarWeb)
+Adicionar o gráfico no Miro
+
+## FASE 12 — Insights estratégicos (~30-60min)
+Criar documento insights-estrategicos.docx em /analises-ia
+O que está funcionando — listar 5 a 10 elementos replicáveis
+Vulnerabilidades — listar pontos fracos do funil
+Diferencial do concorrente — o que ele tem que ninguém mais tem
+Oportunidades de mercado — sub-nichos, faixas de preço, canais ignorados
+Próximos passos — cada um com responsável + prazo + métrica de sucesso
+
+## FASE 13 — Fechamento (~10min)
+Conferir que TODOS os arquivos estão no Drive (não só no PC)
+Conferir que o Miro está legível pra alguém que não participou
+Compartilhar o board do Miro com quem precisa ver
+TERMINADO ✅`;
+
+let state = {
+  projects: [],
+  selectedId: null,
+  filter: 'todos',
+  view: 'project',
+  tagFilter: null,
+};
+
+let settings = {
+  templates: [],
+  defaultTemplateId: null,
+  notifications: { enabled: false, time: '09:00', message: '' },
+  autocollapse: false,
+  gist: { token: '', gistId: '', auto: false, lastSync: null },
+};
+
+let pendingSyncTimer = null;
+let editingTemplateId = null;
+let deferredInstallPrompt = null;
+
+/* ---------- Storage ---------- */
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state.projects = parsed.projects || [];
+      state.selectedId = parsed.selectedId || null;
+      state.view = parsed.view || 'project';
+    }
+    // migrate v1 → v2 (in case the user had data from old version)
+    const oldRaw = localStorage.getItem('spy_projects_v1');
+    if (oldRaw && !raw) {
+      const old = JSON.parse(oldRaw);
+      state.projects = old.projects || [];
+      state.selectedId = old.selectedId || null;
+    }
+    // ensure all projects have new fields
+    state.projects.forEach(p => {
+      p.tags = p.tags || [];
+      p.deadline = p.deadline || null;
+      p.timeline = p.timeline || [];
+      p.links = p.links || [];
+      p.notes = p.notes || '';
+      p.groups.forEach(g => g.items.forEach(i => i.attachments = i.attachments || []));
+    });
+  } catch (e) { console.error(e); }
+
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) settings = { ...settings, ...JSON.parse(raw) };
+  } catch (e) { console.error(e); }
+
+  // ensure at least one template
+  if (!settings.templates || settings.templates.length === 0) {
+    const defaultTpl = {
+      id: uid(),
+      name: 'Análise de Concorrente — Padrão',
+      content: DEFAULT_TEMPLATE_CONTENT,
+    };
+    // migrate old single-template if exists
+    const oldTpl = localStorage.getItem('spy_template_v1');
+    if (oldTpl) defaultTpl.content = oldTpl;
+    settings.templates = [defaultTpl];
+    settings.defaultTemplateId = defaultTpl.id;
+    saveSettingsLocal();
+  }
+  if (!settings.defaultTemplateId || !settings.templates.find(t => t.id === settings.defaultTemplateId)) {
+    settings.defaultTemplateId = settings.templates[0].id;
+  }
+
+  applyTheme();
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    projects: state.projects,
+    selectedId: state.selectedId,
+    view: state.view,
+  }));
+  scheduleAutoSync();
+}
+
+function saveSettingsLocal() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/* ---------- Helpers ---------- */
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function now() { return new Date().toISOString(); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function daysUntil(iso) {
+  if (!iso) return null;
+  const target = new Date(iso); target.setHours(23,59,59,999);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.ceil((target - today) / 86400000);
+}
+
+/* ---------- Template parsing ---------- */
+function parseTemplate(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const groups = [];
+  let current = null;
+  for (const line of lines) {
+    if (line.startsWith('##')) {
+      current = { id: uid(), name: line.replace(/^##\s*/, ''), items: [] };
+      groups.push(current);
+    } else {
+      if (!current) {
+        current = { id: uid(), name: 'Geral', items: [] };
+        groups.push(current);
+      }
+      current.items.push({ id: uid(), text: line, done: false, note: '', attachments: [] });
+    }
+  }
+  return groups;
+}
+
+function getTemplateById(id) {
+  return settings.templates.find(t => t.id === id) || settings.templates[0];
+}
+
+/* ---------- Project CRUD ---------- */
+function openNewProjectModal() {
+  document.getElementById('np_name').value = '';
+  document.getElementById('np_niche').value = '';
+  document.getElementById('np_platform').value = '';
+  document.getElementById('np_tags').value = '';
+  document.getElementById('np_deadline').value = '';
+  document.getElementById('np_desc').value = '';
+  // populate templates dropdown
+  const sel = document.getElementById('np_template');
+  sel.innerHTML = settings.templates.map(t =>
+    `<option value="${t.id}" ${t.id === settings.defaultTemplateId ? 'selected' : ''}>${escapeHtml(t.name)}</option>`
+  ).join('');
+  document.getElementById('newProjectModal').classList.add('show');
+  setTimeout(() => document.getElementById('np_name').focus(), 50);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function createProject() {
+  const name = document.getElementById('np_name').value.trim();
+  if (!name) { toast('Dê um nome ao projeto'); return; }
+  const tplId = document.getElementById('np_template').value;
+  const tpl = getTemplateById(tplId);
+  const tags = document.getElementById('np_tags').value.split(',').map(s => s.trim()).filter(Boolean);
+  const project = {
+    id: uid(),
+    name,
+    niche: document.getElementById('np_niche').value.trim(),
+    platform: document.getElementById('np_platform').value,
+    description: document.getElementById('np_desc').value.trim(),
+    status: 'ativo',
+    tags,
+    deadline: document.getElementById('np_deadline').value || null,
+    createdAt: now(),
+    updatedAt: now(),
+    notes: '',
+    links: [],
+    timeline: [{ ts: now(), action: 'create', text: 'Projeto criado a partir do template ' + tpl.name }],
+    groups: parseTemplate(tpl.content),
+  };
+  state.projects.unshift(project);
+  state.selectedId = project.id;
+  state.view = 'project';
+  save();
+  closeModal('newProjectModal');
+  renderAll();
+  toast('Projeto criado ✓');
+}
+
+function deleteProject(id) {
+  if (!confirm('Excluir este projeto? Não dá pra desfazer.')) return;
+  state.projects = state.projects.filter(p => p.id !== id);
+  if (state.selectedId === id) state.selectedId = null;
+  save();
+  renderAll();
+}
+
+function selectProject(id) {
+  state.selectedId = id;
+  state.view = 'project';
+  save();
+  renderAll();
+}
+
+function setFilter(f) {
+  state.filter = f;
+  document.querySelectorAll('.filter-tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  renderProjectList();
+}
+
+function setView(v) {
+  state.view = v;
+  document.getElementById('viewProjects').classList.toggle('active', v === 'project');
+  document.getElementById('viewDaily').classList.toggle('active', v === 'daily');
+  save();
+  renderAll();
+}
+
+function getProject() { return state.projects.find(p => p.id === state.selectedId); }
+
+function updateProject(mut) {
+  const p = getProject();
+  if (!p) return;
+  mut(p);
+  p.updatedAt = now();
+  save();
+}
+
+function logTimeline(projectId, action, text) {
+  const p = state.projects.find(x => x.id === projectId);
+  if (!p) return;
+  if (!p.timeline) p.timeline = [];
+  p.timeline.unshift({ ts: now(), action, text });
+  if (p.timeline.length > 50) p.timeline = p.timeline.slice(0, 50);
+}
+
+function progressOf(p) {
+  let total = 0, done = 0;
+  for (const g of p.groups) for (const i of g.items) { total++; if (i.done) done++; }
+  return { total, done, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function getAllTags() {
+  const set = new Set();
+  state.projects.forEach(p => (p.tags || []).forEach(t => set.add(t)));
+  return Array.from(set).sort();
+}
+
+function setTagFilter(tag) {
+  state.tagFilter = state.tagFilter === tag ? null : tag;
+  renderTagFilter();
+  renderProjectList();
+}
+
+/* ---------- Render: Sidebar ---------- */
+function renderTagFilter() {
+  const tags = getAllTags();
+  const wrap = document.getElementById('tagFilter');
+  if (tags.length === 0) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = tags.map(t =>
+    `<span class="tag-chip ${state.tagFilter === t ? 'active' : ''}" onclick="setTagFilter('${escapeHtml(t)}')">#${escapeHtml(t)}</span>`
+  ).join('');
+}
+
+function renderProjectList() {
+  const list = document.getElementById('projectList');
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  let items = state.projects.slice();
+  if (state.filter !== 'todos') items = items.filter(p => p.status === state.filter);
+  if (state.tagFilter) items = items.filter(p => (p.tags || []).includes(state.tagFilter));
+  if (q) items = items.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    (p.niche || '').toLowerCase().includes(q) ||
+    (p.description || '').toLowerCase().includes(q) ||
+    (p.tags || []).some(t => t.toLowerCase().includes(q))
+  );
+  if (items.length === 0) {
+    list.innerHTML = `<div style="padding:30px 20px;text-align:center;color:var(--text-dim);font-size:11px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;">Sem casos</div>`;
+    return;
+  }
+  list.innerHTML = items.map(p => {
+    const pr = progressOf(p);
+    const dl = daysUntil(p.deadline);
+    let dlPill = '';
+    if (dl !== null) {
+      const cls = dl < 0 ? 'deadline-late' : (dl <= 3 ? 'deadline-soon' : 'deadline-ok');
+      const lbl = dl < 0 ? `${-dl}d atrás` : (dl === 0 ? 'hoje' : `${dl}d`);
+      dlPill = `<span class="pill ${cls}">${lbl}</span>`;
+    }
+    const tagsHtml = (p.tags || []).slice(0, 3).map(t =>
+      `<span class="pi-tag">#${escapeHtml(t)}</span>`).join('');
+    return `
+      <div class="project-item ${p.id === state.selectedId ? 'active' : ''}" onclick="selectProject('${p.id}')">
+        <div class="pi-name">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${escapeHtml(p.name)}</span>
+          <span class="pill status-${p.status}">${p.status}</span>
+        </div>
+        <div class="pi-meta">
+          <span>${escapeHtml(p.niche || p.platform || '—')}</span>
+          <span>${pr.done}/${pr.total} · ${pr.pct}%</span>
+        </div>
+        ${tagsHtml || dlPill ? `<div class="pi-tags">${tagsHtml}${dlPill}</div>` : ''}
+        <div class="progress-mini"><div class="bar" style="width:${pr.pct}%"></div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ---------- Render: Main router ---------- */
+function renderMain() {
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('projectView').style.display = 'none';
+  document.getElementById('dailyView').style.display = 'none';
+
+  if (state.view === 'daily') {
+    document.getElementById('dailyView').style.display = 'block';
+    renderDailyView();
+    return;
+  }
+  const p = getProject();
+  if (!p) { document.getElementById('emptyState').style.display = 'grid'; return; }
+  document.getElementById('projectView').style.display = 'block';
+  renderProjectView();
+}
+
+/* ---------- Render: Daily ---------- */
+function renderDailyView() {
+  const view = document.getElementById('dailyView');
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  const activeProjects = state.projects.filter(p => p.status === 'ativo');
+
+  // collect all pending items across active projects
+  let totalPending = 0;
+  const projectBlocks = activeProjects.map(p => {
+    const pending = [];
+    p.groups.forEach(g => g.items.forEach(i => {
+      if (!i.done) pending.push({ groupId: g.id, groupName: g.name, item: i });
+    }));
+    totalPending += pending.length;
+    if (pending.length === 0) return '';
+    const dl = daysUntil(p.deadline);
+    const dlInfo = dl !== null ? `· ⏱ ${dl < 0 ? `${-dl}d atrás` : dl === 0 ? 'hoje' : `${dl}d`}` : '';
+    return `
+      <div class="daily-project">
+        <div class="daily-project-header" onclick="selectProject('${p.id}')">
+          <span>${escapeHtml(p.name)}</span>
+          <span class="right">${pending.length} pendente(s) ${dlInfo}</span>
+        </div>
+        <div>
+          ${pending.map(({ groupId, groupName, item }) => `
+            <div class="check-item">
+              <input type="checkbox" onchange="toggleItemFromDaily('${p.id}','${groupId}','${item.id}')" />
+              <div class="item-body">
+                <div class="item-text">${escapeHtml(item.text)}</div>
+                <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${escapeHtml(groupName)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).filter(Boolean).join('');
+
+  view.innerHTML = `
+    <div class="daily-header">
+      <div class="eyebrow">Plano · do · dia</div>
+      <h2 style="text-transform:capitalize">${today.replace(',', '')}</h2>
+      <p>${totalPending} tarefa${totalPending===1?'':'s'} pendente${totalPending===1?'':'s'} em ${activeProjects.length} caso${activeProjects.length===1?'':'s'} ativo${activeProjects.length===1?'':'s'}</p>
+    </div>
+    ${projectBlocks || `<div class="empty" style="height:auto;padding:60px 20px;max-width:none"><div class="empty-inner"><div class="eyebrow" style="color:var(--sage)">Status · Limpo</div><h2>Nada pendente <em>hoje</em>.</h2><p>Todos os casos ativos estão em dia. Bom momento pra abrir um novo ou revisar insights.</p></div></div>`}
+  `;
+}
+
+function toggleItemFromDaily(pid, gid, iid) {
+  const p = state.projects.find(x => x.id === pid);
+  if (!p) return;
+  const g = p.groups.find(x => x.id === gid);
+  if (!g) return;
+  const i = g.items.find(x => x.id === iid);
+  if (!i) return;
+  i.done = !i.done;
+  p.updatedAt = now();
+  logTimeline(pid, i.done ? 'check' : 'uncheck', i.text);
+  save();
+  renderDailyView();
+  renderProjectList();
+}
+
+/* ---------- Render: Project ---------- */
+function renderProjectView() {
+  const p = getProject();
+  const view = document.getElementById('projectView');
+  if (!p) return;
+
+  const pr = progressOf(p);
+  const dl = daysUntil(p.deadline);
+  let banner = '';
+  if (dl !== null) {
+    if (dl < 0) banner = `<div class="deadline-banner late">⏱ Deadline passou há ${-dl} dia(s) (${fmtDate(p.deadline)})</div>`;
+    else if (dl <= 3) banner = `<div class="deadline-banner soon">⏱ Faltam ${dl} dia(s) pro deadline (${fmtDate(p.deadline)})</div>`;
+    else banner = `<div class="deadline-banner ok">⏱ Deadline em ${dl} dia(s) — ${fmtDate(p.deadline)}</div>`;
+  }
+
+  // Phase strip — one segment per group, fill height = % done
+  const phaseStrip = p.groups.map((g, i) => {
+    const total = g.items.length;
+    const done = g.items.filter(it => it.done).length;
+    const pct = total ? Math.round(done / total * 100) : 0;
+    const complete = total > 0 && done === total;
+    return `<div class="phase-segment ${complete ? 'complete' : ''}" title="${escapeHtml(g.name)} — ${done}/${total}" onclick="scrollToGroup('${g.id}')">
+      <div class="fill" style="height:${pct}%"></div>
+      <span class="num">${String(i+1).padStart(2,'0')}</span>
+    </div>`;
+  }).join('');
+
+  view.innerHTML = `
+    <div class="project-header">
+      <div style="flex:1;min-width:0">
+        <div class="project-eyebrow">Caso · Análise de Concorrente</div>
+        <h2 class="project-title" contenteditable="true"
+            onblur="updateProject(p => p.name = this.innerText.trim() || 'Sem nome'); renderProjectList();">${escapeHtml(p.name)}</h2>
+        <div class="project-meta-row">
+          <div class="meta-item">Aberto · ${fmtDate(p.createdAt)}</div>
+          <div class="meta-item">Modificado · ${fmtDate(p.updatedAt)}</div>
+          <div class="meta-item">Nicho:
+            <input type="text" placeholder="—" value="${escapeHtml(p.niche||'')}"
+              onchange="updateProject(p => p.niche = this.value); renderProjectList();" style="width:130px" />
+          </div>
+          <div class="meta-item">Funil:
+            <select onchange="updateProject(p => p.platform = this.value);">
+              <option value="">— a definir —</option>
+              ${['VSL','Webinar / lançamento','Quiz','Página de vendas textual','Híbrido'].map(opt =>
+                `<option ${p.platform===opt?'selected':''}>${opt}</option>`).join('')}
+            </select>
+          </div>
+          <div class="meta-item">Status:
+            <select onchange="updateProject(p => p.status = this.value); renderProjectList();">
+              ${['ativo','pausado','concluido','arquivado'].map(s =>
+                `<option value="${s}" ${p.status===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="meta-item">Prazo:
+            <input type="date" value="${p.deadline||''}"
+              onchange="updateProject(p => p.deadline = this.value || null); renderProjectView(); renderProjectList();" />
+          </div>
+        </div>
+        <div class="tags-row">
+          ${(p.tags||[]).map(t => `
+            <span class="tag">#${escapeHtml(t)}<button onclick="removeTag('${escapeHtml(t)}')" title="Remover">×</button></span>
+          `).join('')}
+          <input type="text" placeholder="+ tag"
+            onkeydown="if(event.key==='Enter'){addTag(this.value); this.value=''}" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn ghost sm" onclick="duplicateProject('${p.id}')">Duplicar</button>
+        <button class="btn ghost sm" onclick="resetChecklist('${p.id}')">Resetar</button>
+        <button class="btn danger sm" onclick="deleteProject('${p.id}')">Excluir</button>
+      </div>
+    </div>
+
+    ${banner}
+
+    <div class="stats-row">
+      <div class="stat hero">
+        <div class="label">Progresso</div>
+        <div>
+          <span class="value">${pr.pct}<span class="pct">%</span></span>
+          <div class="sub">${pr.done} de ${pr.total} tarefas concluídas</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="label">Concluídos</div>
+        <div class="value">${pr.done}<span style="color:var(--text-dim);font-size:18px;font-style:italic"> /${pr.total}</span></div>
+      </div>
+      <div class="stat">
+        <div class="label">Restantes</div>
+        <div class="value">${pr.total - pr.done}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Fases</div>
+        <div class="value">${p.groups.length}</div>
+      </div>
+    </div>
+
+    <div class="phase-strip" title="Progresso por fase">
+      ${phaseStrip}
+    </div>
+
+    <div class="checklist">
+      ${p.groups.map((g, i) => renderGroup(p, g, i)).join('')}
+      <div class="checklist-footer">
+        <button class="btn secondary sm" onclick="addGroup()">+ Adicionar fase</button>
+      </div>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Notas gerais</h3>
+        <textarea placeholder="Insights, ideias, observações…"
+          onblur="updateProject(p => p.notes = this.value)">${escapeHtml(p.notes || '')}</textarea>
+      </div>
+      <div class="panel">
+        <h3>Links e referências</h3>
+        <div class="links-list">
+          ${(p.links||[]).map((l,i) => `
+            <div class="link-item">
+              <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.label || l.url)}</a>
+              <button onclick="removeLink(${i})" title="Remover">✕</button>
+            </div>
+          `).join('') || '<div style="font-size:12px;color:var(--text-dim);font-style:italic">Nenhum link ainda.</div>'}
+        </div>
+        <div class="link-add">
+          <input id="newLinkLabel" type="text" placeholder="Rótulo (opcional)" />
+          <input id="newLinkUrl" type="text" placeholder="https://..." />
+          <button class="btn sm" onclick="addLink()">+</button>
+        </div>
+      </div>
+      <div class="panel" style="grid-column:1/-1">
+        <h3>Timeline · últimas atividades</h3>
+        <div class="timeline">
+          ${(p.timeline||[]).slice(0,30).map(t => `
+            <div class="timeline-item action-${t.action}">
+              <div class="ts">${fmtDateTime(t.ts)}</div>
+              <div>${escapeHtml(t.text)}</div>
+            </div>
+          `).join('') || '<div style="font-size:12px;color:var(--text-dim);font-style:italic">Sem atividade ainda.</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="id-strip">
+      Caso ${p.id} <span class="sep">·</span> Salvo localmente <span class="sep">·</span> ${pr.total} tarefas
+    </div>
+  `;
+}
+
+function scrollToGroup(gid) {
+  const el = document.querySelector(`[data-group="${gid}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderGroup(p, g, idx) {
+  const total = g.items.length;
+  const done = g.items.filter(i => i.done).length;
+  const collapsed = g.collapsed ? 'collapsed' : '';
+  const complete = total > 0 && done === total ? 'complete' : '';
+  const phaseNum = String((idx ?? 0) + 1).padStart(2, '0');
+  // Try to parse phase title like "FASE 1 — Setup (~5min)" → split into label and time
+  const parsed = parseGroupName(g.name);
+  return `
+    <div class="group-block ${complete}" data-group="${g.id}">
+      <div class="group-header ${collapsed}" onclick="toggleGroup('${g.id}')">
+        <div class="group-info">
+          <span class="phase-num">${phaseNum}</span>
+          <div class="phase-text">
+            ${parsed.eyebrow ? `<div class="phase-eyebrow">${escapeHtml(parsed.eyebrow)}</div>` : ''}
+            <span class="phase-title" contenteditable="true" onclick="event.stopPropagation()"
+              onblur="renameGroup('${g.id}', this.innerText)">${escapeHtml(parsed.title)}</span>
+          </div>
+        </div>
+        <div class="right" onclick="event.stopPropagation()">
+          <span class="count">${done}/${total}</span>
+          <button class="btn ghost sm" onclick="deleteGroup('${g.id}')" title="Excluir fase">✕</button>
+          <span class="chev">▼</span>
+        </div>
+      </div>
+      <div class="group-items ${collapsed}">
+        ${g.items.map(i => renderItem(g.id, i)).join('')}
+        <div class="add-item-row">
+          <input type="text" placeholder="+ adicionar tarefa…"
+            onkeydown="if(event.key==='Enter'){addItem('${g.id}', this.value); this.value=''}" />
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Splits "FASE 1 — Setup (~5min)" into { eyebrow: "FASE 1", title: "Setup (~5min)" }
+function parseGroupName(name) {
+  if (!name) return { eyebrow: '', title: '' };
+  const m = name.match(/^(FASE\s+\d+)\s*[—–-]\s*(.+)$/i);
+  if (m) return { eyebrow: m[1], title: m[2] };
+  return { eyebrow: '', title: name };
+}
+
+function renderItem(gid, i) {
+  const atts = (i.attachments || []);
+  return `
+    <div class="check-item ${i.done ? 'done' : ''}" id="item-${i.id}">
+      <input type="checkbox" ${i.done ? 'checked' : ''} onchange="toggleItem('${gid}','${i.id}')" />
+      <div class="item-body">
+        <div class="item-text" contenteditable="true"
+          onblur="renameItem('${gid}','${i.id}', this.innerText)">${escapeHtml(i.text)}</div>
+        <textarea class="item-note ${i.note ? 'show' : ''}" placeholder="Anotação..."
+          onblur="setNote('${gid}','${i.id}', this.value)">${escapeHtml(i.note || '')}</textarea>
+        ${atts.length > 0 ? `
+        <div class="attachments">
+          ${atts.map((a, ai) => `
+            <div class="attachment" onclick="openImgViewer('${a.dataUrl}')">
+              <img src="${a.dataUrl}" alt="${escapeHtml(a.name||'')}" />
+              <button class="rm" onclick="event.stopPropagation();removeAttachment('${gid}','${i.id}',${ai})">✕</button>
+            </div>
+          `).join('')}
+        </div>` : ''}
+        <input type="file" id="att-${i.id}" accept="image/*" multiple style="display:none"
+          onchange="addAttachments('${gid}','${i.id}', this.files)" />
+      </div>
+      <div class="item-actions">
+        <button onclick="toggleNote('${gid}','${i.id}')" title="Nota">📝</button>
+        <button onclick="document.getElementById('att-${i.id}').click()" title="Anexar imagem">📎</button>
+        <button onclick="deleteItem('${gid}','${i.id}')" title="Excluir">✕</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Item / group actions ---------- */
+function toggleItem(gid, iid) {
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    const i = g.items.find(x => x.id === iid); if (!i) return;
+    i.done = !i.done;
+    logTimeline(p.id, i.done ? 'check' : 'uncheck', i.text);
+    if (settings.autocollapse && i.done) {
+      const allDone = g.items.every(x => x.done);
+      if (allDone) g.collapsed = true;
+    }
+  });
+  renderProjectView();
+  renderProjectList();
+}
+function renameItem(gid, iid, text) {
+  text = text.trim(); if (!text) return;
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    const i = g.items.find(x => x.id === iid); if (!i) return;
+    if (i.text === text) return;
+    i.text = text;
+    logTimeline(p.id, 'edit', 'Editado: ' + text);
+  });
+}
+function deleteItem(gid, iid) {
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    const i = g.items.find(x => x.id === iid);
+    g.items = g.items.filter(x => x.id !== iid);
+    if (i) logTimeline(p.id, 'remove', 'Removido: ' + i.text);
+  });
+  renderProjectView();
+  renderProjectList();
+}
+function addItem(gid, text) {
+  text = text.trim(); if (!text) return;
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    g.items.push({ id: uid(), text, done: false, note: '', attachments: [] });
+    logTimeline(p.id, 'add', 'Adicionado: ' + text);
+  });
+  renderProjectView();
+  renderProjectList();
+}
+function toggleNote(gid, iid) {
+  const p = getProject(); if (!p) return;
+  const g = p.groups.find(x => x.id === gid); if (!g) return;
+  const i = g.items.find(x => x.id === iid); if (!i) return;
+  if (!i.note) i.note = ' ';
+  renderProjectView();
+}
+function setNote(gid, iid, text) {
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    const i = g.items.find(x => x.id === iid); if (!i) return;
+    i.note = text.trim();
+  });
+}
+function toggleGroup(gid) {
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    g.collapsed = !g.collapsed;
+  });
+  renderProjectView();
+}
+function renameGroup(gid, name) {
+  name = name.trim(); if (!name) return;
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    // preserve "FASE N — " eyebrow if it existed
+    const parsed = parseGroupName(g.name);
+    if (parsed.eyebrow) {
+      g.name = `${parsed.eyebrow} — ${name}`;
+    } else {
+      g.name = name;
+    }
+  });
+}
+function deleteGroup(gid) {
+  if (!confirm('Excluir este grupo e todas as tarefas dele?')) return;
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid);
+    p.groups = p.groups.filter(x => x.id !== gid);
+    if (g) logTimeline(p.id, 'remove', 'Grupo removido: ' + g.name);
+  });
+  renderProjectView();
+  renderProjectList();
+}
+function addGroup() {
+  const name = prompt('Nome do novo grupo:');
+  if (!name) return;
+  updateProject(p => {
+    p.groups.push({ id: uid(), name: name.trim(), items: [] });
+    logTimeline(p.id, 'add', 'Grupo adicionado: ' + name.trim());
+  });
+  renderProjectView();
+}
+function resetChecklist(id) {
+  if (!confirm('Resetar a checklist deste projeto pro template padrão? Anotações e anexos serão perdidos.')) return;
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  const tpl = getTemplateById(settings.defaultTemplateId);
+  p.groups = parseTemplate(tpl.content);
+  p.updatedAt = now();
+  logTimeline(p.id, 'reset', 'Checklist resetada (' + tpl.name + ')');
+  save();
+  renderProjectView();
+  renderProjectList();
+  toast('Checklist resetada');
+}
+function duplicateProject(id) {
+  const p = state.projects.find(x => x.id === id); if (!p) return;
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = uid();
+  copy.name = p.name + ' (cópia)';
+  copy.createdAt = now();
+  copy.updatedAt = now();
+  copy.timeline = [{ ts: now(), action: 'create', text: 'Duplicado de ' + p.name }];
+  for (const g of copy.groups) {
+    g.id = uid();
+    for (const i of g.items) { i.id = uid(); i.done = false; i.attachments = []; }
+  }
+  state.projects.unshift(copy);
+  state.selectedId = copy.id;
+  save();
+  renderAll();
+  toast('Projeto duplicado');
+}
+
+/* ---------- Tags ---------- */
+function addTag(tag) {
+  tag = tag.trim().replace(/^#/, ''); if (!tag) return;
+  updateProject(p => {
+    if (!p.tags) p.tags = [];
+    if (p.tags.includes(tag)) return;
+    p.tags.push(tag);
+  });
+  renderProjectView();
+  renderProjectList();
+  renderTagFilter();
+}
+function removeTag(tag) {
+  updateProject(p => { p.tags = (p.tags || []).filter(t => t !== tag); });
+  renderProjectView();
+  renderProjectList();
+  renderTagFilter();
+}
+
+/* ---------- Links ---------- */
+function addLink() {
+  const url = document.getElementById('newLinkUrl').value.trim();
+  const label = document.getElementById('newLinkLabel').value.trim();
+  if (!url) return;
+  updateProject(p => {
+    if (!p.links) p.links = [];
+    p.links.push({ url, label });
+  });
+  renderProjectView();
+}
+function removeLink(idx) {
+  updateProject(p => { p.links.splice(idx, 1); });
+  renderProjectView();
+}
+
+/* ---------- Attachments (image, base64, resized) ---------- */
+function addAttachments(gid, iid, files) {
+  if (!files || files.length === 0) return;
+  const promises = Array.from(files).map(f => resizeImage(f, 1000, 0.8));
+  Promise.all(promises).then(results => {
+    updateProject(p => {
+      const g = p.groups.find(x => x.id === gid); if (!g) return;
+      const i = g.items.find(x => x.id === iid); if (!i) return;
+      if (!i.attachments) i.attachments = [];
+      results.forEach((dataUrl, idx) => {
+        i.attachments.push({ name: files[idx].name, dataUrl });
+      });
+      logTimeline(p.id, 'add', `${results.length} anexo(s) em "${i.text}"`);
+    });
+    renderProjectView();
+    toast(`${results.length} imagem(s) anexada(s)`);
+  });
+}
+function removeAttachment(gid, iid, idx) {
+  updateProject(p => {
+    const g = p.groups.find(x => x.id === gid); if (!g) return;
+    const i = g.items.find(x => x.id === iid); if (!i) return;
+    i.attachments.splice(idx, 1);
+  });
+  renderProjectView();
+}
+function resizeImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = height * (maxDim / width); width = maxDim; }
+          else { width = width * (maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function openImgViewer(src) {
+  document.getElementById('imgViewerImg').src = src;
+  document.getElementById('imgViewer').classList.add('show');
+}
+function closeImgViewer() { document.getElementById('imgViewer').classList.remove('show'); }
+
+/* ---------- Templates (multiple) ---------- */
+function openTemplatesModal() {
+  hideTemplateEditor();
+  renderTemplatesList();
+  document.getElementById('templatesModal').classList.add('show');
+}
+function renderTemplatesList() {
+  const list = document.getElementById('templatesList');
+  list.innerHTML = settings.templates.map(t => `
+    <div class="template-row">
+      <span class="name">${escapeHtml(t.name)}</span>
+      ${t.id === settings.defaultTemplateId ? '<span class="badge">padrão</span>' : ''}
+      <button class="btn ghost sm" onclick="editTemplate('${t.id}')">Editar</button>
+      ${t.id !== settings.defaultTemplateId ? `<button class="btn ghost sm" onclick="setDefaultTemplate('${t.id}')">Tornar padrão</button>` : ''}
+    </div>
+  `).join('') || '<div style="font-size:12px;color:var(--text-dim)">Nenhum template.</div>';
+}
+function newTemplate() {
+  const t = { id: uid(), name: 'Novo template', content: DEFAULT_TEMPLATE_CONTENT };
+  settings.templates.push(t);
+  saveSettingsLocal();
+  editTemplate(t.id);
+}
+function editTemplate(id) {
+  const t = settings.templates.find(x => x.id === id);
+  if (!t) return;
+  editingTemplateId = id;
+  document.getElementById('tpl_name').value = t.name;
+  document.getElementById('tpl_content').value = t.content;
+  document.getElementById('tpl_default').checked = id === settings.defaultTemplateId;
+  document.getElementById('templateEditor').style.display = 'block';
+  document.getElementById('templatesList').style.display = 'none';
+  document.getElementById('templatesModalFooter').style.display = 'none';
+}
+function hideTemplateEditor() {
+  editingTemplateId = null;
+  document.getElementById('templateEditor').style.display = 'none';
+  document.getElementById('templatesList').style.display = 'block';
+  document.getElementById('templatesModalFooter').style.display = 'flex';
+}
+function saveCurrentTemplate() {
+  const t = settings.templates.find(x => x.id === editingTemplateId);
+  if (!t) return;
+  t.name = document.getElementById('tpl_name').value.trim() || 'Sem nome';
+  t.content = document.getElementById('tpl_content').value.trim();
+  if (document.getElementById('tpl_default').checked) settings.defaultTemplateId = t.id;
+  saveSettingsLocal();
+  hideTemplateEditor();
+  renderTemplatesList();
+  toast('Template salvo');
+}
+function deleteCurrentTemplate() {
+  if (settings.templates.length <= 1) { toast('Mantém pelo menos um template'); return; }
+  if (!confirm('Excluir este template?')) return;
+  settings.templates = settings.templates.filter(x => x.id !== editingTemplateId);
+  if (settings.defaultTemplateId === editingTemplateId) {
+    settings.defaultTemplateId = settings.templates[0].id;
+  }
+  saveSettingsLocal();
+  hideTemplateEditor();
+  renderTemplatesList();
+}
+function setDefaultTemplate(id) {
+  settings.defaultTemplateId = id;
+  saveSettingsLocal();
+  renderTemplatesList();
+  toast('Template padrão atualizado');
+}
+
+/* ---------- Settings (notifications + behavior) ---------- */
+function openSettingsModal() {
+  document.getElementById('notif_enabled').checked = settings.notifications.enabled;
+  document.getElementById('notif_time').value = settings.notifications.time || '09:00';
+  document.getElementById('notif_msg').value = settings.notifications.message || '';
+  document.getElementById('set_autocollapse').checked = !!settings.autocollapse;
+  document.getElementById('settingsModal').classList.add('show');
+}
+function saveSettings() {
+  const enabled = document.getElementById('notif_enabled').checked;
+  if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(perm => {
+      if (perm !== 'granted') {
+        toast('Permissão de notificação negada');
+        document.getElementById('notif_enabled').checked = false;
+        return;
+      }
+      finishSaveSettings();
+    });
+  } else {
+    finishSaveSettings();
+  }
+}
+function finishSaveSettings() {
+  settings.notifications.enabled = document.getElementById('notif_enabled').checked;
+  settings.notifications.time = document.getElementById('notif_time').value;
+  settings.notifications.message = document.getElementById('notif_msg').value.trim();
+  settings.autocollapse = document.getElementById('set_autocollapse').checked;
+  saveSettingsLocal();
+  closeModal('settingsModal');
+  toast('Configurações salvas');
+  setupNotificationLoop();
+}
+
+/* ---------- Notifications ---------- */
+let notifTimer = null;
+let lastNotifDate = null;
+function setupNotificationLoop() {
+  if (notifTimer) clearInterval(notifTimer);
+  if (!settings.notifications.enabled) return;
+  notifTimer = setInterval(checkNotificationTime, 60000);
+  checkNotificationTime();
+}
+function checkNotificationTime() {
+  if (!settings.notifications.enabled) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  const [h, m] = (settings.notifications.time || '09:00').split(':').map(Number);
+  const today = now.toISOString().slice(0, 10);
+  if (lastNotifDate === today) return;
+  if (now.getHours() === h && now.getMinutes() === m) {
+    const totalPending = state.projects
+      .filter(p => p.status === 'ativo')
+      .reduce((sum, p) => sum + p.groups.reduce((s, g) => s + g.items.filter(i => !i.done).length, 0), 0);
+    if (totalPending > 0) {
+      const msg = settings.notifications.message ||
+        `Você tem ${totalPending} tarefa(s) pendente(s) em projetos ativos.`;
+      new Notification('Spy Projects — Lembrete', { body: msg, icon: 'icon.svg' });
+    }
+    lastNotifDate = today;
+  }
+}
+
+/* ---------- Sync via GitHub Gist ---------- */
+function openSyncModal() {
+  document.getElementById('sync_token').value = settings.gist.token || '';
+  document.getElementById('sync_gistid').value = settings.gist.gistId || '';
+  document.getElementById('sync_auto').checked = !!settings.gist.auto;
+  const status = document.getElementById('syncStatus');
+  status.textContent = settings.gist.lastSync
+    ? '✓ Última sync: ' + fmtDateTime(settings.gist.lastSync)
+    : 'Nunca sincronizado';
+  document.getElementById('syncModal').classList.add('show');
+}
+function saveSyncSettings() {
+  settings.gist.token = document.getElementById('sync_token').value.trim();
+  settings.gist.gistId = document.getElementById('sync_gistid').value.trim();
+  settings.gist.auto = document.getElementById('sync_auto').checked;
+  saveSettingsLocal();
+  toast('Config de sync salva');
+}
+function setSyncDot(state) {
+  const d = document.getElementById('syncDot');
+  d.className = 'sync-dot ' + (state || '');
+}
+async function syncPush() {
+  saveSyncSettings();
+  const { token, gistId } = settings.gist;
+  if (!token) { toast('Cadastre um token primeiro'); return; }
+  setSyncDot('syncing');
+  const payload = JSON.stringify({
+    version: 2,
+    exportedAt: now(),
+    projects: state.projects,
+    settings: { ...settings, gist: undefined },
+  }, null, 2);
+  const body = {
+    description: 'Spy Projects backup',
+    public: false,
+    files: { 'spy-projects.json': { content: payload } },
+  };
+  try {
+    let res;
+    if (gistId) {
+      res = await fetch('https://api.github.com/gists/' + gistId, {
+        method: 'PATCH',
+        headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } else {
+      res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!gistId) {
+      settings.gist.gistId = data.id;
+      document.getElementById('sync_gistid').value = data.id;
+      toast('Gist criado: ' + data.id);
+    } else {
+      toast('Sync ✓');
+    }
+    settings.gist.lastSync = now();
+    saveSettingsLocal();
+    setSyncDot('ok');
+    document.getElementById('syncStatus').textContent = '✓ Última sync: ' + fmtDateTime(settings.gist.lastSync);
+  } catch (e) {
+    console.error(e);
+    toast('Erro: ' + e.message);
+    setSyncDot('err');
+  }
+}
+async function syncPull() {
+  saveSyncSettings();
+  const { token, gistId } = settings.gist;
+  if (!token || !gistId) { toast('Cadastre token e gist ID'); return; }
+  if (!confirm('Puxar dados do Gist? Vai sobrescrever os projetos locais.')) return;
+  setSyncDot('syncing');
+  try {
+    const res = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { Authorization: 'token ' + token },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const file = data.files && data.files['spy-projects.json'];
+    if (!file) throw new Error('Arquivo spy-projects.json não encontrado no gist');
+    const content = JSON.parse(file.content);
+    state.projects = content.projects || [];
+    state.selectedId = state.projects[0]?.id || null;
+    if (content.settings) {
+      const oldGist = settings.gist;
+      settings = { ...settings, ...content.settings, gist: oldGist };
+      saveSettingsLocal();
+    }
+    settings.gist.lastSync = now();
+    saveSettingsLocal();
+    save();
+    setSyncDot('ok');
+    renderAll();
+    toast('Dados importados do Gist ✓');
+  } catch (e) {
+    console.error(e);
+    toast('Erro: ' + e.message);
+    setSyncDot('err');
+  }
+}
+function scheduleAutoSync() {
+  if (!settings.gist.auto || !settings.gist.token || !settings.gist.gistId) return;
+  if (pendingSyncTimer) clearTimeout(pendingSyncTimer);
+  pendingSyncTimer = setTimeout(() => { syncPush(); }, 5000);
+}
+
+/* ---------- Shortcuts ---------- */
+function openShortcutsModal() { document.getElementById('shortcutsModal').classList.add('show'); }
+
+/* ---------- Import / Export ---------- */
+function exportData() {
+  const blob = new Blob([JSON.stringify({
+    version: 2,
+    exportedAt: now(),
+    projects: state.projects,
+    settings: { ...settings, gist: { ...settings.gist, token: '' } }, // strip token
+  }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `spy-projects-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup exportado');
+}
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.projects) throw new Error('formato inválido');
+      if (!confirm(`Importar ${data.projects.length} projeto(s)? Vai sobrescrever os atuais.`)) return;
+      state.projects = data.projects;
+      state.selectedId = data.projects[0]?.id || null;
+      if (data.settings) {
+        const oldGist = settings.gist;
+        settings = { ...settings, ...data.settings, gist: oldGist };
+        saveSettingsLocal();
+      }
+      save();
+      renderAll();
+      toast('Importado ✓');
+    } catch (err) { toast('Erro: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+/* ---------- Theme ---------- */
+function applyTheme() {
+  const t = localStorage.getItem(THEME_KEY) || 'dark';
+  if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+}
+function toggleTheme() {
+  const cur = localStorage.getItem(THEME_KEY) || 'dark';
+  const nxt = cur === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, nxt);
+  applyTheme();
+}
+
+/* ---------- PWA install ---------- */
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBtn').style.display = 'inline-flex';
+});
+function installPwa() {
+  if (!deferredInstallPrompt) { toast('App já instalado ou navegador não suporta'); return; }
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(c => {
+    if (c.outcome === 'accepted') toast('App instalado ✓');
+    deferredInstallPrompt = null;
+    document.getElementById('installBtn').style.display = 'none';
+  });
+}
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW registration failed', e));
+  });
+}
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ---------- Boot ---------- */
+function renderAll() {
+  renderTagFilter();
+  renderProjectList();
+  renderMain();
+}
+
+document.addEventListener('keydown', e => {
+  // Ignore if typing in input/textarea/contenteditable
+  const tgt = e.target;
+  const isTyping = tgt.matches('input, textarea, [contenteditable="true"]');
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.show').forEach(m => m.classList.remove('show'));
+    closeImgViewer();
+    return;
+  }
+  if (isTyping) return;
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openNewProjectModal(); }
+  else if (e.key === '/') { e.preventDefault(); document.getElementById('searchInput').focus(); }
+  else if (e.key === 'd' || e.key === 'D') { setView(state.view === 'project' ? 'daily' : 'project'); }
+  else if (e.key === 't' || e.key === 'T') { openTemplatesModal(); }
+  else if (e.key === ',') { openSettingsModal(); }
+  else if (e.key === '?') { openShortcutsModal(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); syncPush(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const filtered = visibleProjects();
+    if (filtered.length === 0) return;
+    const idx = filtered.findIndex(p => p.id === state.selectedId);
+    let next;
+    if (e.key === 'ArrowDown') next = filtered[Math.min(idx + 1, filtered.length - 1)];
+    else next = filtered[Math.max(idx - 1, 0)];
+    if (next) selectProject(next.id);
+  }
+});
+function visibleProjects() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  let items = state.projects.slice();
+  if (state.filter !== 'todos') items = items.filter(p => p.status === state.filter);
+  if (state.tagFilter) items = items.filter(p => (p.tags || []).includes(state.tagFilter));
+  if (q) items = items.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    (p.niche || '').toLowerCase().includes(q) ||
+    (p.tags || []).some(t => t.toLowerCase().includes(q))
+  );
+  return items;
+}
+
+document.querySelectorAll('.modal-backdrop').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+});
+
+load();
+renderAll();
+setupNotificationLoop();
+if (state.view === 'daily') setView('daily');
+</script>
+</body>
+</html>
